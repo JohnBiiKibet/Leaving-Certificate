@@ -86,7 +86,12 @@ if not st.session_state.auth_token:
             school_name = st.text_input("Complete School Name (As per MoE Registration)")
             level = st.selectbox("Institutional Type", ["Primary", "Secondary"])
             county = st.text_input("Sub-County / County Location")
-            registered = st.form_submit_with_button("Provision School Infrastructure Account")
+            # Line 89 - Change this:
+# registered = st.form_submit_with_button("Provision School Infrastructure Account")
+
+# To this:
+            registered = st.form_submit_button("Provision School Infrastructure Account")
+
             
             if registered:
                 try:
