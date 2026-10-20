@@ -9,7 +9,7 @@ from supabase import create_client, Client
 # ReportLab libraries for official certificate generation layout execution
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
@@ -182,3 +182,4 @@ elif menu == "🎓 Issue New Leaving Certificate":
         issue_cert = st.form_submit_button("Compile, Register & Provision Official Leaving Certificate")
 
         if issue_cert:
+            if not student_name or not adm_no or not index_no:
