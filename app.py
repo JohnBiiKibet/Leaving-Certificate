@@ -51,7 +51,7 @@ def handle_logout():
     st.rerun()
 
 # ==============================================================================
-# 2. APPLICATION AUTHENTICATION ROUTING GATEWAY (BYPASSED)
+# 2. APPLICATION AUTHENTICATION ROUTING GATEWAY
 # ==============================================================================
 if not st.session_state.auth_token:
     st.title("🇰🇪 Kenya School Leaving Certificate Portal")
@@ -168,15 +168,14 @@ if menu == "🎓 Issue New Leaving Certificate":
                 st.error("Validation Halt: Student Name, Admission ID, and KNEC Index Number fields are mandatory.")
             else:
                 with st.spinner("Compiling structural layout profiles..."):
-                    cert_uuid = str(uuid.uuid4())
-                    verification_url = f"https://streamlit.app{cert_uuid}"
-                    
-                    # Log record into database table if client parameters exist
-                    if supabase:
-                        try:
-                            cert_payload = {
-                                "id": cert_uuid,
-                                "school_id": st.session_state.school_id,
-                                "student_name": student_name,
-                                "admission_no": adm_no,
-                                "index_no": index_no,
+                    try:
+                        cert_uuid = str(uuid.uuid4())
+                        verification_url = f"https://streamlit.app{cert_uuid}"
+                        
+                        # Correctly structured dictionary data packet mapping
+                        cert_payload = {
+                            "id": cert_uuid,
+                            "school_id": st.session_state.school_id,
+                            "student_name": student_name,
+                            "admission_no": adm_no,
+                            "index_no": index_no,
