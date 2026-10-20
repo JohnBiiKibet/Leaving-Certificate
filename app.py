@@ -145,8 +145,15 @@ if menu == "🏛️ Institutional Branding":
         try:
             ext = logo_file.name.split(".")[-1].lower()
             bucket_path = f"logos/{st.session_state.school_id}_{uuid.uuid4().hex[:6]}.{ext}"
-            supabase.storage.from("certificates").upload(path=bucket_path, file=logo_file.getvalue(), file_options={"content-type": f"image/{ext}", "upsert": "true"})
-            public_logo_url = supabase.storage.from("certificates").get_public_url(bucket_path)
+            
+            # Syntax fixed here: properly chained storage access loop configuration
+            supabase.storage.from_("certificates").upload(
+                path=bucket_path, 
+                file=logo_file.getvalue(), 
+                file_options={"content-type": f"image/{ext}", "upsert": "true"}
+            )
+            
+            public_logo_url = supabase.storage.from_("certificates").get_public_url(bucket_path)
             supabase.table("schools").update({"school_logo_url": public_logo_url}).eq("id", st.session_state.school_id).execute()
             st.success("Logo catalog configuration pipeline sync completed successfully!")
             st.rerun()
@@ -177,7 +184,4 @@ elif menu == "🎓 Issue New Leaving Certificate":
         conduct = st.selectbox("General Evaluation of Behavioral Conduct & Attitude", ["Excellent", "Very Good", "Good", "Fair"])
         headteacher_remarks = st.text_area("Principal / Headteacher's Final Comprehensive Report Remarks")
         co_curricular = st.text_area("Notable Extracurricular Engagements or Talents Exhibited")
-
-        # Compile and write records out to database tracking grid
-        issue_cert = st.form_submit_button("Compile, Register & Provision Official Leaving Certificate")
 
