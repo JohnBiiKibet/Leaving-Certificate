@@ -1,206 +1,187 @@
 import os
 import uuid
+import pandas as pd
 from io import BytesIO
 import streamlit as st
 from supabase import create_client, Client
 
-# ReportLab libraries for official certificate generation
+# ReportLab libraries for official certificate generation layout execution
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 # ==============================================================================
-# 1. DATABASE & INITIALIZATION
+# 1. APPLICATION ENVIRONMENT PLATFORM INITIALIZATION
 # ==============================================================================
-st.set_page_config(page_title="Kenya School Leaving Certificate Portal", layout="centered", page_icon="🇰🇪")
+st.set_page_config(page_title="Kenya School Leaving Certificate Portal", layout="wide", page_icon="🇰🇪")
 
-# Load environment configuration variables
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", "https://supabase.co"))
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", ""))
+if os.path.exists(".env"):
+    from dotenv import load_dotenv
+    load_dotenv()
 
-if not SUPABASE_URL or SUPABASE_URL == "https://supabase.co" or not SUPABASE_KEY:
-    st.error("❌ Configuration Error: Please set your 'SUPABASE_URL' and 'SUPABASE_KEY' environment variables.")
+# Prioritize local or production secret assignments; Fallback explicitly to your active project API domain
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", "")).strip()
+if not SUPABASE_URL or "supabase.com" in SUPABASE_URL.lower() and not ".supabase.co" in SUPABASE_URL.lower():
+    SUPABASE_URL = "https://supabase.co"
+
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhaWpzbWx6bnJ2xHN1aGxqeXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDY0NTgsImV4cCI6MjEwNzk4MjQ1OH0.nLMUPq_wVDwz1EJWpo6Udn3epmuNq-eSSZVsavm8zMY")).strip()
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Critical Failure: Infrastructure integration keys missing from global environmental execution space.")
     st.stop()
 
 @st.cache_resource
 def get_supabase_client() -> Client:
-    return create_client(SUPABASE_URL.strip("/"), SUPABASE_KEY)
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 supabase = get_supabase_client()
 
-# ==============================================================================
-# 2. PDF GENERATION ENGINE
-# ==============================================================================
-def build_pdf_bytes(cert_data: dict) -> bytes:
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=letter,
-        rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36
-    )
-    
-    styles = getSampleStyleSheet()
-    
-    # Custom Typography Styles
-    title_style = ParagraphStyle(
-        'CertTitle', parent=styles['Normal'], fontName='Helvetica-Bold',
-        fontSize=24, leading=28, alignment=TA_CENTER, textColor=colors.HexColor('#1E3A8A')
-    )
-    subtitle_style = ParagraphStyle(
-        'CertSub', parent=styles['Normal'], fontName='Helvetica',
-        fontSize=12, leading=16, alignment=TA_CENTER, textColor=colors.HexColor('#4B5563')
-    )
-    section_heading = ParagraphStyle(
-        'SectionHead', parent=styles['Normal'], fontName='Helvetica-Bold',
-        fontSize=14, leading=18, alignment=TA_CENTER, textColor=colors.HexColor('#B91C1C'),
-        spaceAfter=15
-    )
-    body_style = ParagraphStyle(
-        'CertBody', parent=styles['Normal'], fontName='Helvetica',
-        fontSize=11, leading=22, alignment=TA_LEFT, textColor=colors.HexColor('#1F2937')
-    )
+# Establish baseline reactive execution context values
+if "auth_token" not in st.session_state:
+    st.session_state.auth_token = None
+if "school_id" not in st.session_state:
+    st.session_state.school_id = None
+if "school_name" not in st.session_state:
+    st.session_state.school_name = ""
 
-    story = []
-    
-    # Certificate Header Panel
-    story.append(Paragraph("REPUBLIC OF KENYA", title_style))
-    story.append(Spacer(1, 4))
-    story.append(Paragraph("MINISTRY OF EDUCATION", subtitle_style))
-    story.append(Spacer(1, 15))
-    story.append(Paragraph("SCHOOL LEAVING CERTIFICATE", section_heading))
-    story.append(Spacer(1, 10))
-    
-    # Structured Identity Matrix Data
-    certificate_text = f"""
-    <b>This is to certify that:</b> {cert_data['student_name'].upper()}<br/><br/>
-    <b>Admission Number:</b> {cert_data['admission_no']} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
-    <b>Date of Birth:</b> {cert_data['dob']}<br/><br/>
-    <b>Institution Name:</b> {cert_data['school_name'].upper()}<br/><br/>
-    <b>Date of Entrance:</b> {cert_data['date_of_entrance']} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
-    <b>Date of Leaving:</b> {cert_data['date_of_leaving']}<br/><br/>
-    <b>Headteacher's Assessment on Ability / Industry:</b><br/>
-    {cert_data['headteacher_remarks']}<br/><br/>
-    <b>Co-Curricular Activities & Extracurricular Responsibilities:</b><br/>
-    {cert_data['co_curricular_remarks']}
-    """
-    
-    story.append(Paragraph(certificate_text, body_style))
-    story.append(Spacer(1, 50))
-    
-    # Signature Ledger Layout Blocks
-    sig_data = [
-        [
-            Paragraph(f"<b>Date of Issue:</b> {cert_data['date_of_issue']}", body_style),
-            Paragraph("<b>Signature:</b> _______________________<br/>Headteacher's Stamp", body_style)
-        ]
-    ]
-    sig_table = Table(sig_data, colWidths=[250, 250])
-    sig_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('ALIGN', (1,0), (1,0), 'RIGHT')
-    ]))
-    
-    story.append(sig_table)
-    
-    # Build complete execution layout
-    doc.build(story)
-    pdf_data = buffer.getvalue()
-    buffer.close()
-    return pdf_data
+def handle_logout():
+    st.session_state.auth_token = None
+    st.session_state.school_id = None
+    st.session_state.school_name = ""
+    st.rerun()
 
 # ==============================================================================
-# 3. INTERACTIVE DATA APPLICATION INTERFACE
+# 2. APPLICATION AUTHENTICATION ROUTING GATEWAY
 # ==============================================================================
-st.title("🇰🇪 Kenya School Leaving Certificate System")
-st.subheader("Official Form Entry & PDF Record Generation Terminal")
-
-tab_create, tab_records = st.tabs(["🎓 Issue New Certificate", "📊 Historic Database Registry"])
-
-# MODULE A: INPUT FORM ENTRY PIPELINE
-with tab_create:
-    with st.form("certificate_form", clear_on_submit=True):
-        st.write("### Institutional Identity Elements")
-        school_name = st.text_input("Complete School Name (As per MoE Registration)")
-        
-        st.write("### Scholar Demographics Profile")
-        col1, col2 = st.columns(2)
-        with col1:
-            student_name = st.text_input("Full Pupil Name (In Block Letters)")
-            admission_no = st.text_input("Unique Institutional Admission ID Reference")
-        with col2:
-            dob = st.date_input("Official Date of Birth Check")
-            date_of_issue = st.date_input("Certificate Production Authentication Date")
+if not st.session_state.auth_token:
+    st.title("🇰🇪 Kenya School Leaving Certificate Portal")
+    st.subheader("Official Ministry of Education Multi-Tenant Management Gateway")
+    
+    tab_login, tab_signup = st.tabs(["🔒 School Administrator Login", "📝 Register New Institution Account"])
+    
+    with tab_login:
+        with st.form("login_form"):
+            email = st.text_input("Official Institutional Email Address")
+            password = st.text_input("Security Access Password", type="password")
+            submitted = st.form_submit_button("Authenticate Session")
             
-        st.write("### Academic Enrolment Timeline")
-        col3, col4 = st.columns(2)
-        with col3:
-            date_of_entrance = st.date_input("Date of Institutional Enrollment Admission")
-        with col4:
-            date_of_leaving = st.date_input("Official Date of Graduation / Leaving")
-            
-        st.write("### Performance Metrics & Evaluation Assessment Summaries")
-        headteacher_remarks = st.text_area("Headteacher's Assessment Profile on Ability, Character and General Industry")
-        co_curricular_remarks = st.text_area("Co-Curricular Accomplishments, Games Played, and Positions of Leadership Held")
-        
-        generate_btn = st.form_submit_button("Verify Record Metadata & Generate PDF")
-        
-        if generate_btn:
-            if not school_name or not student_name or not admission_no:
-                st.error("Validation Error: Please make sure School Name, Student Name, and Admission Number are provided.")
-            else:
-                # Structure payload dataset schema matching PostgreSQL types
-                cert_payload = {
-                    "id": str(uuid.uuid4()),
-                    "school_name": school_name,
-                    "student_name": student_name,
-                    "admission_no": admission_no,
-                    "dob": str(dob),
-                    "date_of_entrance": str(date_of_entrance),
-                    "date_of_leaving": str(date_of_leaving),
-                    "date_of_issue": str(date_of_issue),
-                    "headteacher_remarks": headteacher_remarks,
-                    "co_curricular_remarks": co_curricular_remarks
-                }
-                
+            if submitted:
                 try:
-                    # Database records storage persistence grid sync loop executions
-                    supabase.table("certificates").insert(cert_payload).execute()
-                    st.success(f"✔️ Record for {student_name} successfully cataloged into database infrastructure matrix.")
+                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    st.session_state.auth_token = res.session.access_token
+                    st.session_state.school_id = res.user.id
                     
-                    # Compute execution loop metrics for binary PDF stream blocks
-                    pdf_bytes = build_pdf_bytes(cert_payload)
+                    # Fetch profile meta mapping metrics from schools ledger matrix
+                    profile = supabase.table("schools").select("school_name").eq("id", res.user.id).execute()
+                    if profile.data:
+                        st.session_state.school_name = profile.data[0]["school_name"]
+                    st.success("Session verified! Accessing dashboard configuration space...")
+                    st.rerun()
+                except Exception as e:
+                    st.error("Authentication Failed: Invalid credentials.")
                     
-                    st.download_button(
-                        label="⬇️ Download Official Generated Leaving Certificate PDF",
-                        data=pdf_bytes,
-                        file_name=f"Leaving_Certificate_{admission_no}.pdf",
-                        mime="application/pdf"
-                    )
-                except Exception as db_err:
-                    st.error(f"Infrastructure Interruption: Error uploading dataset mapping arrays. Details: {str(db_err)}")
+    with tab_signup:
+        with st.form("signup_form"):
+            new_email = st.text_input("Official School Email")
+            new_password = st.text_input("Choose Strong Password", type="password")
+            school_name_input = st.text_input("Complete School Name (As per MoE Registration)")
+            level = st.selectbox("Institutional Type", ["Primary", "Secondary"])
+            county = st.text_input("Sub-County / County Location")
+            registered = st.form_submit_button("Provision School Infrastructure Account")
+            
+            if registered:
+                if not new_email or len(new_password) < 6 or not school_name_input:
+                    st.error("Validation Error: Please fill all fields. Password must be 6+ characters.")
+                else:
+                    try:
+                        auth_res = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                        if auth_res.user:
+                            supabase.table("schools").insert({
+                                "id": auth_res.user.id,
+                                "school_name": school_name_input,
+                                "school_level": level,
+                                "county": county
+                            }).execute()
+                            st.success("Account provisioned successfully! Proceed to sign in.")
+                    except Exception as e:
+                        st.error(f"Registration Interrupted: Database processing mismatch. Details: {str(e)}")
+    st.stop()
 
-# MODULE B: DATAFRAME RECORDS AUDIT LOG GRID
-with tab_records:
-    st.write("### Registered Leaving Certificates Log Grid")
-    try:
-        query_response = supabase.table("certificates").select("*").order("created_at", descending=True).execute()
-        
-        if query_response.data:
-            df = pd.DataFrame(query_response.data)
-            
-            # Format UI rendering components gracefully for visualization matrix display
-            display_columns = {
-                "admission_no": "Admission No",
-                "student_name": "Student Name",
-                "school_name": "Institution Name",
-                "date_of_leaving": "Date Left",
-                "date_of_issue": "Date Issued"
-            }
-            st.dataframe(df[list(display_columns.keys())].rename(columns=display_columns), use_container_width=True)
+# ==============================================================================
+# 3. INTERACTIVE SECURED MANAGEMENT APPLICATION CONTROL CENTER
+# ==============================================================================
+st.sidebar.title("🏫 Control Center")
+st.sidebar.markdown(f"**Institution:** \n{st.session_state.school_name}")
+st.sidebar.button("Secure Application Terminate", on_click=handle_logout)
+
+# Query metadata configurations profile profile
+try:
+    school_profile = supabase.table("schools").select("*").eq("id", st.session_state.school_id).single().execute()
+except Exception as config_err:
+    st.error(f"Critical Metadata Profile Read Interrupted: {str(config_err)}")
+    st.stop()
+
+menu = st.sidebar.radio("Navigation Workspace Router", [
+    "🏛️ Institutional Branding",
+    "🎓 Issue New Leaving Certificate",
+    "📊 Historic Registries & Audit Logs"
+])
+
+# ------------------------------------------------------------------------------
+# MODULE A: INSTITUTIONAL CONFIGURATIONS BRAND HUB
+# ------------------------------------------------------------------------------
+if menu == "🏛️ Institutional Branding":
+    st.title("🏛️ Institutional Branding & Metadata Asset Hub")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info(f"**Registered Name:** {school_profile.data['school_name']}\n\n**Academic Tier:** {school_profile.data['school_level']} School\n\n**Regional Jurisdiction Location:** {school_profile.data['county']} County")
+    with col2:
+        if school_profile.data.get("school_logo_url"):
+            st.image(school_profile.data["school_logo_url"], width=120, caption="Active Verified School Crest Image Asset")
         else:
-            st.info("No registered scholar leaving certificates found in the database registry matrix yet.")
+            st.warning("No custom institutional emblem file detected.")
             
-    except Exception as read_err:
-        st.error(f"Failed to query current state metrics array from PostgreSQL Database node instances: {str(read_err)}")
+    logo_file = st.file_uploader("Upload New High-Resolution Logo/Crest File Asset", type=["png", "jpg", "jpeg"])
+    if logo_file and st.button("Commit Logo File Asset to Secure Storage Grid"):
+        try:
+            ext = logo_file.name.split(".")[-1].lower()
+            bucket_path = f"logos/{st.session_state.school_id}_{uuid.uuid4().hex[:6]}.{ext}"
+            
+            supabase.storage.from_("certificates").upload(
+                path=bucket_path, 
+                file=logo_file.getvalue(), 
+                file_options={"content-type": f"image/{ext}", "upsert": "true"}
+            )
+            
+            public_logo_url = supabase.storage.from_("certificates").get_public_url(bucket_path)
+            supabase.table("schools").update({"school_logo_url": public_logo_url}).eq("id", st.session_state.school_id).execute()
+            st.success("Logo catalog configuration pipeline sync completed successfully!")
+            st.rerun()
+        except Exception as logo_err:
+            st.error(f"Asset Transmission Error: {str(logo_err)}")
+
+# ------------------------------------------------------------------------------
+# MODULE B: LEAVING CERTIFICATE PIPELINE (INDEX NUMBER COMPILER GRID)
+# ------------------------------------------------------------------------------
+elif menu == "🎓 Issue New Leaving Certificate":
+    st.title("🎓 Ministry of Education Certificate Compiler Engine")
+    
+    with st.form("cert_input_form"):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            student_name = st.text_input("Pupil's Full Legal Name (Caps Recommended)").upper()
+            adm_no = st.text_input("Official School Admission Registration ID (Adm No)")
+            index_no = st.text_input("National Examination Index Number (KNEC Code Mapping)")
+        with c2:
+            mean_grade = st.selectbox("Final Mean Grade Attained", ["A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "E"])
+            dob = st.date_input("Date of Birth")
+            date_entered = st.date_input("Official Institutional Enrollment Date")
+        with c3:
+            class_entered = st.text_input("Class / Form upon Initial Admission Entry")
+            date_left = st.date_input("Official Graduation / Leaving Date")
+            class_left = st.text_input("Final Class / Form level upon Departure")
+            
+        conduct = st.selectbox("General Evaluation of Behavioral Conduct & Attitude", ["Excellent", "Very Good", "Good", "Fair"])
+        headteacher_remarks = st.text_area("Principal / Headteacher's Final Comprehensive Report Remarks")
