@@ -1,4 +1,9 @@
 import os
+# Forcefully wipe any hidden or cached environment variables causing collisions
+os.environ.pop("SUPABASE_KEY", None)
+os.environ.pop("SUPABASE_URL", None)
+
+import os
 import uuid
 import qrcode
 import requests
