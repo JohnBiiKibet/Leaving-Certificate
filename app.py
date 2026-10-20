@@ -178,4 +178,4 @@ if menu == "🎓 Issue New Leaving Certificate":
                             "school_id": st.session_state.school_id,
                             "student_name": student_name,
                             "admission_no": adm_no,
-                            "index_no": index_no,
+                            "index_no": index_no,}
