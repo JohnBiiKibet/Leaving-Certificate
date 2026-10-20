@@ -172,11 +172,21 @@ if menu == "🎓 Issue New Leaving Certificate":
                         cert_uuid = str(uuid.uuid4())
                         verification_url = f"https://streamlit.app{cert_uuid}"
                         
+                    
                         cert_payload = {
-                            "id": cert_uuid,
-                            "school_id": st.session_state.school_id,
-                            "student_name": student_name,
-                            "admission_no": adm_no,
-                            "index_no": index_no,
-                            "date_of_birth": str(dob),
-                            "date_entered": str(date_entered),
+                        "id": cert_uuid,
+                        "school_id": st.session_state.school_id,
+                        "student_name": student_name,
+                        "admission_no": adm_no,
+                        "index_no": index_no,
+                        "date_of_birth": str(dob),
+                        "date_entered": str(date_entered),
+                        "class_entered": class_entered,
+                        "date_left": str(date_left),
+                        "class_left": class_left,
+                        "mean_grade": mean_grade,
+                        "conduct_remarks": conduct,
+                        "principal_remarks": headteacher_remarks,
+                        "co_curricular_activities": co_curricular,
+                        "verification_url": verification_url
+                    }  # 👈 Make sure your file has this closing brace right here!
