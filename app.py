@@ -1,5 +1,4 @@
-Kenya School Leaving Certificate Portal - Streamlit Code
-This document contains the unauthenticated version of the Streamlit application code with your active Supabase 'soul' project configuration.
+
 import os
 import uuid
 import pandas as pd
