@@ -1,3 +1,11 @@
+# ==============================================================================
+# 0. REQUIRED DEPENDENCY IMPORTS (MUST BE AT THE ABSOLUTE TOP)
+# ==============================================================================
+import os
+import uuid
+import pandas as pd
+from io import BytesIO
+import streamlit as st  # 👈 This must load first before line 5 can run!
 
 # ==============================================================================
 # 1. HARDENED INFRASTRUCTURE PLATFORM INITIALIZATION
@@ -21,18 +29,6 @@ try:
 except Exception as e:
     st.sidebar.error(f"Initialization Failed: {str(e)}")
 
-import os
-import uuid
-import pandas as pd
-from io import BytesIO
-import streamlit as st
-
-# ReportLab libraries for official certificate generation layout execution
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 # ==============================================================================
 # 1. APPLICATION ENVIRONMENT PLATFORM INITIALIZATION
