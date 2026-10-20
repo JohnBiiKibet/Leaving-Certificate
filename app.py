@@ -62,7 +62,7 @@ if not st.session_state.auth_token:
         with st.form("login_form"):
             email = st.text_input("Official Institutional Email Address")
             password = st.text_input("Security Access Password", type="password")
-            submitted = st.form_submit_with_button("Authenticate Session")
+            submitted = st.form_submit_button("Authenticate Session")
             
             if submitted:
                 try:
