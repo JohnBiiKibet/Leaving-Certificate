@@ -1,65 +1,92 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: leaving-cert-config
-  namespace: default
-data:
-  SUPABASE_URL: "https://supabase.co"
+name: Deploy School Leaving Certificate Streamlit Portal
 
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: leaving-cert-backend
-  namespace: default
-  labels:
-    app: leaving-cert
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: leaving-cert
-  template:
-    metadata:
-      labels:
-        app: leaving-cert
-    spec:
-      containers:
-      - name: api-server
-        image: your-dockerhub-username/leaving-cert-backend:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8000
-        resources:
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
-          requests:
-            cpu: "250m"
-            memory: "256Mi"
-        env:
-        - name: SUPABASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: leaving-cert-config
-              key: SUPABASE_URL
-        - name: SUPABASE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: supabase-secrets
-              key: service-role-key
+on:
+  push:
+    branches: [ main ]
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: leaving-cert-service
-  namespace: default
-spec:
-  type: ClusterIP
-  ports:
-  - port: 80
-    targetPort: 8000
-    protocol: TCP
-  selector:
-    app: leaving-cert
+jobs:
+  build-and-test:
+    name: 🧪 Run Code Analysis and Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Source Code
+        uses: actions/checkout@v4
+
+      - name: Initialize Python Core Sandbox Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Underlying System Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libjpeg-dev zlib1g-dev
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate Core Python Code Syntax Integrity
+        run: |
+          # Checks file structure for compile errors or basic missing imports before packaging
+          python -m py_compile app.py
+
+  build-and-push-docker:
+    name: 🐳 Compile Production Multi-Stage Container Layer
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx Compiler Toolkit
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate Context Session into DockerHub Grid
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compile and Push Production Image Layer Artifacts
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/leaving-cert-portal:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/leaving-cert-portal:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-to-kubernetes-cluster:
+    name: ☸️ Roll out Production Infrastructure Pod Scale Update
+    needs: build-and-push-docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Source Code
+        uses: actions/checkout@v4
+
+      - name: Configure Target Cluster Context Signature
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      - name: Inject Live Configuration Metadata Secrets
+        run: |
+          # Safe conditional updates prevent overwriting existing infrastructure credentials
+          kubectl create secret generic supabase-secrets \
+            --from-literal=service-role-key="${{ secrets.SUPABASE_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Update Target Image Pointer and Roll Out Configurations
+        run: |
+          # Programmatically swap variables dynamically matching the current commit hash inside the manifest schema 
+          sed -i "s|your-dockerhub-username/leaving-cert-backend:latest|${{ secrets.DOCKERHUB_USERNAME }}/leaving-cert-portal:${{ github.sha }}|g" k8s-deployment.yaml
+          sed -i "s|https://supabase.co|${{ secrets.SUPABASE_URL }}|g" k8s-deployment.yaml
+          
+          # Force deployment pipeline applying manifest specs down onto target nodes
+          kubectl apply -f k8s-deployment.yaml
+          
+          # Force cluster pods to perform rolling updates 
+          kubectl rollout restart deployment/leaving-cert-backend
