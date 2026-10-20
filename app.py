@@ -1,3 +1,26 @@
+
+# ==============================================================================
+# 1. HARDENED INFRASTRUCTURE PLATFORM INITIALIZATION
+# ==============================================================================
+st.set_page_config(page_title="Kenya School Leaving Certificate Portal", layout="wide", page_icon="🇰🇪")
+
+# Enforce clean string loading; completely strip spaces or default website overrides
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://supabase.co").strip()
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhaWpzbWx6bnJ2eHN1aGxqeXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDY0NTgsImV4cCI6MjEwNzk4MjQ1OH0.nLMUPq_wVDwz1EJWpo6Udn3epmuNq-eSSZVsavm8zMY").strip()
+
+# Final safety check: if something injected a corporate marketing URL, override it instantly
+if "supabase.com" in SUPABASE_URL.lower() and not ".supabase.co" in SUPABASE_URL.lower():
+    SUPABASE_URL = "https://supabase.co"
+
+# Initialize Supabase client infrastructure explicitly using verified keys
+supabase = None
+try:
+    from supabase import create_client
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.sidebar.error(f"Initialization Failed: {str(e)}")
+
 import os
 import uuid
 import pandas as pd
