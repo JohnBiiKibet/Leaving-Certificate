@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: leaving-cert-config
+  namespace: default
+data:
+  SUPABASE_URL: "https://supabase.co"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: leaving-cert-backend
+  namespace: default
+  labels:
+    app: leaving-cert
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: leaving-cert
+  template:
+    metadata:
+      labels:
+        app: leaving-cert
+    spec:
+      containers:
+      - name: api-server
+        image: your-dockerhub-username/leaving-cert-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+        env:
+        - name: SUPABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: leaving-cert-config
+              key: SUPABASE_URL
+        - name: SUPABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: supabase-secrets
+              key: service-role-key
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: leaving-cert-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: leaving-cert
