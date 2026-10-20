@@ -23,7 +23,7 @@ if os.path.exists(".env"):
 # Prioritize local or production secret assignments; Fallback explicitly to your active project API domain
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", "")).strip()
 if not SUPABASE_URL or "supabase.com" in SUPABASE_URL.lower() and not ".supabase.co" in SUPABASE_URL.lower():
-    SUPABASE_URL = "https://supabase.co"
+    SUPABASE_URL = "https://vaijsmlznrvxsuhljyzz.supabase.co"
 
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhaWpzbWx6bnJ2xHN1aGxqeXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDY0NTgsImV4cCI6MjEwNzk4MjQ1OH0.nLMUPq_wVDwz1EJWpo6Udn3epmuNq-eSSZVsavm8zMY")).strip()
 
@@ -73,7 +73,7 @@ if not st.session_state.auth_token:
                         st.session_state.school_id = res.user.id
                         profile = supabase.table("schools").select("school_name").eq("id", res.user.id).execute()
                         if profile.data:
-                            st.session_state.school_name = profile.data[0]["school_name"]
+                            st.session_state.school_name = profile.data["school_name"]
                         st.success("Session verified!")
                         st.rerun()
                     except Exception as e:
@@ -170,23 +170,105 @@ if menu == "🎓 Issue New Leaving Certificate":
                 with st.spinner("Compiling structural layout profiles..."):
                     try:
                         cert_uuid = str(uuid.uuid4())
-                        verification_url = f"https://streamlit.app{cert_uuid}"
+                        verification_url = f"https://leaving-certificate-cdtq3dflgykxbspyeavizj.streamlit.app/verify?id={cert_uuid}"
                         
-                    
+                        # Full configuration properties dictionary mapping
                         cert_payload = {
-                        "id": cert_uuid,
-                        "school_id": st.session_state.school_id,
-                        "student_name": student_name,
-                        "admission_no": adm_no,
-                        "index_no": index_no,
-                        "date_of_birth": str(dob),
-                        "date_entered": str(date_entered),
-                        "class_entered": class_entered,
-                        "date_left": str(date_left),
-                        "class_left": class_left,
-                        "mean_grade": mean_grade,
-                        "conduct_remarks": conduct,
-                        "principal_remarks": headteacher_remarks,
-                        "co_curricular_activities": co_curricular,
-                        "verification_url": verification_url
-                    }  # 👈 Make sure your file has this closing brace right here!
+                            "id": cert_uuid,
+                            "school_id": st.session_state.school_id,
+                            "student_name": student_name,
+                            "admission_no": adm_no,
+                            "index_no": index_no,
+                            "date_of_birth": str(dob),
+                            "date_entered": str(date_entered),
+                            "class_entered": class_entered,
+                            "date_left": str(date_left),
+                            "class_left": class_left,
+                            "mean_grade": mean_grade,
+                            "conduct_remarks": conduct,
+                            "principal_remarks": headteacher_remarks,
+                            "co_curricular_activities": co_curricular,
+                            "verification_url": verification_url
+                        }
+                        
+                        if supabase:
+                            try:
+                                supabase.table("certificates").insert(cert_payload).execute()
+                            except Exception as db_e:
+                                st.sidebar.warning(f"Database sync skipped: {str(db_e)}")
+                        
+                        # --- COMPILING THE PDF WITH REPORTLAB ---
+                        pdf_buffer = BytesIO()
+                        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+                        styles = getSampleStyleSheet()
+                        current_story = []
+                        
+                        title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=18, alignment=TA_CENTER, spaceAfter=5)
+                        sub_style = ParagraphStyle('SubStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=12, alignment=TA_CENTER, spaceAfter=20)
+                        body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=18, spaceAfter=10)
+                        
+                        current_story.append(Paragraph("REPUBLIC OF KENYA", title_style))
+                        current_story.append(Paragraph(f"MINISTRY OF EDUCATION — {st.session_state.school_name.upper()}", title_style))
+                        current_story.append(Paragraph("OFFICIAL SCHOOL LEAVING CERTIFICATE", sub_style))
+                        current_story.append(Spacer(1, 15))
+                        
+                        data_matrix = [
+                            [Paragraph(f"<b>Student Legal Name:</b> {student_name}", body_style), Paragraph(f"<b>KNEC Index Number:</b> {index_no}", body_style)],
+                            [Paragraph(f"<b>Admission No:</b> {adm_no}", body_style), Paragraph(f"<b>Date of Birth:</b> {str(dob)}", body_style)],
+                            [Paragraph(f"<b>Date Entered:</b> {str(date_entered)}", body_style), Paragraph(f"<b>Class/Form Entered:</b> {class_entered}", body_style)],
+                            [Paragraph(f"<b>Date of Leaving:</b> {str(date_left)}", body_style), Paragraph(f"<b>Class/Form Left:</b> {class_left}", body_style)],
+                            [Paragraph(f"<b>Mean Grade Attained:</b> {mean_grade}", body_style), Paragraph(f"<b>Conduct Assessment:</b> {conduct}", body_style)]
+                        ]
+                        
+                        # FIXED: explicit widths assigned to layout tables
+                        t = Table(data_matrix, colWidths=[260, 260])
+                        t.setStyle(TableStyle([
+                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+                            ('TOPPADDING', (0,0), (-1,-1), 8),
+                        ]))
+                        current_story.append(t)
+                        current_story.append(Spacer(1, 20))
+                        
+                        current_story.append(Paragraph(f"<b>Co-Curricular Activities & Responsibilities:</b><br/>{co_curricular}", body_style))
+                        current_story.append(Spacer(1, 10))
+                        current_story.append(Paragraph(f"<b>Principal / Headteacher Comprehensive Remarks:</b><br/>{headteacher_remarks}", body_style))
+                        current_story.append(Spacer(1, 40))
+                        
+                        sig_matrix = [
+                            [Paragraph("________________________________________<br/>Principal / Headteacher Signature", body_style),
+                             Paragraph(f"<b>Verification Key ID:</b><br/>{cert_uuid}", body_style)]
+                        ]
+                        sig_table = Table(sig_matrix, colWidths=[260, 260])
+                        current_story.append(sig_table)
+                        
+                        doc.build(current_story)
+                        pdf_data = pdf_buffer.getvalue()
+                        
+                        st.success("🎉 PDF Certificate Compiled Successfully!")
+                        st.download_button(
+                            label="📥 Click Here to Download Generated Certificate PDF",
+                            data=pdf_data,
+                            file_name=f"Leaving_Certificate_{adm_no}.pdf",
+                            mime="application/pdf"
+                        )
+                    except Exception as err:
+                        st.error(f"Compilation Interrupted: Layout configuration error. Details: {str(err)}")
+
+# ------------------------------------------------------------------------------
+# MODULE B: INSTITUTIONAL BRAND SETUP
+# ------------------------------------------------------------------------------
+elif menu == "🏛️ Institutional Branding":
+    st.title("🏛️ Institutional Branding Hub")
+    st.info(f"**Current active school space:** {st.session_state.school_name}")
+    logo_file = st.file_uploader("Upload School Crest Image", type=["png", "jpg", "jpeg"])
+    if logo_file:
+        st.success("Logo file asset loaded into current view buffer context.")
+
+# ------------------------------------------------------------------------------
+# MODULE C: LEDGER REGISTRIES VIEW PANEL
+# ------------------------------------------------------------------------------
+elif menu == "📊 Historic Registries & Audit Logs":
+    st.title("📊 Historic Certificate Registries Ledger")
+    st.info("Bypass Mode active: Connect Supabase endpoints via Streamlit Cloud Secrets to read persistent historical entries.")
