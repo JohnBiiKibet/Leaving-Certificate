@@ -23,15 +23,20 @@ if os.path.exists(".env"):
 
 # Prioritize Streamlit production secrets; Fallback cleanly to runtime system environment vectors
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", "https://supabase.co"))
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhaWpzbWx6bnJ2xHN1aGxqeXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDY0NTgsImV4cCI6MjEwNzk4MjQ1OH0.nLMUPq_wVDwz1EJWpo6Udn3epmuNq-eSSZVsavm8zMY"))
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", ""))
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("Critical Failure: Infrastructure integration keys missing from global environmental execution space.")
+# CORRECTION: Verify the project URL is configured and isn't pointing to the root Supabase marketing page
+if not SUPABASE_URL or SUPABASE_URL == "https://supabase.co" or not SUPABASE_KEY:
+    st.error(
+        "❌ Critical Failure: Infrastructure integration keys missing or misconfigured. "
+        "Please check your `.env` file or Streamlit secrets config to ensure 'SUPABASE_URL' is set to your unique project API URL (e.g., https://your-project-id.supabase.co)."
+    )
     st.stop()
 
 @st.cache_resource
 def get_supabase_client() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Ensure there are no accidental trailing slashes in the initialization path
+    return create_client(SUPABASE_URL.strip("/"), SUPABASE_KEY)
 
 supabase = get_supabase_client()
 
@@ -156,32 +161,5 @@ if menu == "🏛️ Institutional Branding":
             public_logo_url = supabase.storage.from_("certificates").get_public_url(bucket_path)
             supabase.table("schools").update({"school_logo_url": public_logo_url}).eq("id", st.session_state.school_id).execute()
             st.success("Logo catalog configuration pipeline sync completed successfully!")
-            st.rerun()
-        except Exception as logo_err:
-            st.error(f"Asset Transmission Error: {str(logo_err)}")
-
-# ------------------------------------------------------------------------------
-# MODULE B: LEAVING CERTIFICATE PIPELINE (INDEX NUMBER COMPILER GRID)
-# ------------------------------------------------------------------------------
-elif menu == "🎓 Issue New Leaving Certificate":
-    st.title("🎓 Ministry of Education Certificate Compiler Engine")
-    
-    with st.form("cert_input_form"):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            student_name = st.text_input("Pupil's Full Legal Name (Caps Recommended)").upper()
-            adm_no = st.text_input("Official School Admission Registration ID (Adm No)")
-            index_no = st.text_input("National Examination Index Number (KNEC Code Mapping)")
-        with c2:
-            mean_grade = st.selectbox("Final Mean Grade Attained", ["A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "E"])
-            dob = st.date_input("Date of Birth")
-            date_entered = st.date_input("Official Institutional Enrollment Date")
-        with c3:
-            class_entered = st.text_input("Class / Form upon Initial Admission Entry")
-            date_left = st.date_input("Official Graduation / Leaving Date")
-            class_left = st.text_input("Final Class / Form level upon Departure")
-            
-        conduct = st.selectbox("General Evaluation of Behavioral Conduct & Attitude", ["Excellent", "Very Good", "Good", "Fair"])
-        headteacher_remarks = st.text_area("Principal / Headteacher's Final Comprehensive Report Remarks")
-        co_curricular = st.text_area("Notable Extracurricular Engagements or Talents Exhibited")
-
+        except Exception as e:
+            st.error(f"Storage System Synchronization Error: {str(e)}")
